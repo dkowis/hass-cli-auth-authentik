@@ -11,8 +11,8 @@ Assistant, but may also work with other command line auth systems.
 
 - Authenticate users via Authentik using a custom flow.
 - Map users to Home Assistant groups based on Authentik group membership.
-_- Configurable via a simple `config.toml` file.
-- Designed for use as a Home_
+- Configurable via a simple `config.toml` file.
+- Designed for use as a Home
   Assistant [command line authentication provider](https://www.home-assistant.io/docs/authentication/providers/#command-line).
 
 ---
@@ -30,9 +30,11 @@ _- Configurable via a simple `config.toml` file.
 ---
 
 ## Installation
+
 ### Download a release!
 
 ### Build the project by hand
+
 1. **Build the project:**
 
    ```bash
@@ -46,11 +48,12 @@ _- Configurable via a simple `config.toml` file.
 ## Configuration
 
 Create a `config.toml` file in the application directory, based on the following example:
+
 ```toml
-authentik_base_url = "https://auth.example.com" 
-flow_slug = "simple-password" 
-admin_group_name = "Home Assistant Admins" 
-user_group_name = "Home Assistant Users" 
+authentik_base_url = "https://auth.example.com"
+flow_slug = "simple-password"
+admin_group_name = "Home Assistant Admins"
+user_group_name = "Home Assistant Users"
 timeout = 10
 ``` 
 
@@ -67,13 +70,16 @@ timeout = 10
 ## Setting up Authentik Flow
 
 > ⚠️ Before using this application, you must create a suitable **authentication flow** in Authentik.  
-> The flow must accept the user's `username` and `password`, and provide the necessary user information when authentication succeeds.
+> The flow must accept the user's `username` and `password`, and provide the necessary user information when
+> authentication succeeds.
 
 ### Terraform Example code for the flow
 
-You can use the [terraform provider](https://registry.terraform.io/providers/goauthentik/authentik/latest) provided by authentik to create the flow.
+You can use the [terraform provider](https://registry.terraform.io/providers/goauthentik/authentik/latest) provided by
+authentik to create the flow.
 If you don't use that, you do need to create a flow that mimics the behavior of this flow.
-It should have 2 stages. The first stage should take a username **and password** and the second stage is just the user_login
+It should have 2 stages. The first stage should take a username **and password** and the second stage is just the
+user_login
 stage.
 
 ```terraform
@@ -88,16 +94,16 @@ data "authentik_stage" "default-authentication-login" {
 }
 
 resource "authentik_stage_identification" "api_auth_identification_stage" {
-  name = "api_auth_identification"
+  name           = "api_auth_identification"
   user_fields = ["username"]
   sources = [data.authentik_source.inbuilt.uuid]
   password_stage = data.authentik_stage.default-authentication-password.id
 }
 
 resource "authentik_flow" "home_assistant_api_password" {
-  name = "simple-password"
-  title = "Simple Password"
-  slug = "simple-password"
+  name        = "simple-password"
+  title       = "Simple Password"
+  slug        = "simple-password"
   designation = "authentication" //it's for authenticating users
 }
 
@@ -118,6 +124,7 @@ resource "authentik_flow_stage_binding" "simple_password_login_binding" {
 ## Usage
 
 You can use the authentication provider directly via the command line:
+
 ```bash
 ./hass-cli-auth-authentik --username username --password password  --config_path config. toml
 ``` 
@@ -131,14 +138,16 @@ Environment variables `username` and `password` can also be used to supply crede
 
 ## Integration with Home Assistant
 
-This project is designed for use with [Home Assistant's command line authentication provider](https://www.home-assistant.io/docs/authentication/providers/#command-line).
+This project is designed for use
+with [Home Assistant's command line authentication provider](https://www.home-assistant.io/docs/authentication/providers/#command-line).
 
 ### Example Home Assistant Configuration
 
 In your Home Assistant `configuration.yaml`:
+
 ```yaml 
-homeassistant: 
-  auth_providers: 
+homeassistant:
+  auth_providers:
     - type: command_line
       command: "/your/path/to/hass-cli-auth-authentik"
       # optionally, if it's not in the same directory as the executable:
@@ -150,17 +159,22 @@ homeassistant:
 
 ### How the Integration Works
 
-- If the authenticated user is in the configured `admin_group_name`, they are mapped to the Home Assistant admin group (`system-admin`).
-- If the authenticated user is in the `user_group_name`, they are mapped to the Home Assistant users group (`system-users`).
+- If the authenticated user is in the configured `admin_group_name`, they are mapped to the Home Assistant admin group (
+  `system-admin`).
+- If the authenticated user is in the `user_group_name`, they are mapped to the Home Assistant users group (
+  `system-users`).
 - If no groups are configured, and the user is authenticated, they're allowed to log in, but no groups assigned.
-- If any groups are configured, and the user is authenticated, but not in any of those groups, they are not allowed to log in.
+- If any groups are configured, and the user is authenticated, but not in any of those groups, they are not allowed to
+  log in.
 
 ---
 
 ## Troubleshooting
 
-- Turn up verbosity using `-v` or `-vvv`: Note `TRACE` Level will output passwords onto the console, because they're in the environment.
-- **User not found or not in required group:** Make sure the Authentik flow is correct and the user is a member of the correct group(s).
+- Turn up verbosity using `-v` or `-vvv`: Note `TRACE` Level will output passwords onto the console, because they're in
+  the environment.
+- **User not found or not in required group:** Make sure the Authentik flow is correct and the user is a member of the
+  correct group(s).
 - **Timeout errors:** Increase the `timeout` parameter in `config.toml` if needed.
 - **Flow errors:** Double-check your Authentik flow setup.
 
@@ -173,5 +187,6 @@ homeassistant:
 ---
 
 ### Notes
+
 - Please refer to the [Authentik documentation](https://docs.goauthentik.io/docs/developer-docs/api/flow-executor)
   for flow setup and group management.
