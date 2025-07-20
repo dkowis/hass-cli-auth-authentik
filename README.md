@@ -30,7 +30,9 @@ _- Configurable via a simple `config.toml` file.
 ---
 
 ## Installation
+### Download a release!
 
+### Build the project by hand
 1. **Build the project:**
 
    ```bash
@@ -67,17 +69,57 @@ timeout = 10
 > ⚠️ Before using this application, you must create a suitable **authentication flow** in Authentik.  
 > The flow must accept the user's `username` and `password`, and provide the necessary user information when authentication succeeds.
 
-### Required Fields/Stages for the Flow
+### Terraform Example code for the flow
 
-**[Please fill in this section with the specific Authentik flow requirements for your deployment, such as required stage types and field names.]**
+You can use the [terraform provider](https://registry.terraform.io/providers/goauthentik/authentik/latest) provided by authentik to create the flow.
+If you don't use that, you do need to create a flow that mimics the behavior of this flow.
+It should have 2 stages. The first stage should take a username **and password** and the second stage is just the user_login
+stage.
+
+```terraform
+data "authentik_source" "inbuilt" {
+  managed = "goauthentik.io/sources/inbuilt"
+}
+data "authentik_stage" "default-authentication-password" {
+  name = "default-authentication-password"
+}
+data "authentik_stage" "default-authentication-login" {
+  name = "default-authentication-login"
+}
+
+resource "authentik_stage_identification" "api_auth_identification_stage" {
+  name = "api_auth_identification"
+  user_fields = ["username"]
+  sources = [data.authentik_source.inbuilt.uuid]
+  password_stage = data.authentik_stage.default-authentication-password.id
+}
+
+resource "authentik_flow" "home_assistant_api_password" {
+  name = "simple-password"
+  title = "Simple Password"
+  slug = "simple-password"
+  designation = "authentication" //it's for authenticating users
+}
+
+resource "authentik_flow_stage_binding" "simple_password_identification_binding" {
+  target = authentik_flow.home_assistant_api_password.uuid
+  stage  = authentik_stage_identification.api_auth_identification_stage.id
+  order  = 0
+}
+resource "authentik_flow_stage_binding" "simple_password_login_binding" {
+  target = authentik_flow.home_assistant_api_password.uuid
+  stage  = data.authentik_stage.default-authentication-login.id
+  order  = 20
+}
+```
 
 ---
 
 ## Usage
 
 You can use the authentication provider directly via the command line:
-```
-bash ./command-line-auth-provider --username  --password  --config_path config. toml
+```bash
+./hass-cli-auth-authentik --username username --password password  --config_path config. toml
 ``` 
 
 - Returns exit code `0` if authentication succeeds, and prints fields required by Home Assistant.
@@ -98,7 +140,9 @@ In your Home Assistant `configuration.yaml`:
 homeassistant: 
   auth_providers: 
     - type: command_line
-      command: "/your/path/to/command-line-auth-provider --config_path /your/path/to/config.toml" 
+      command: "/your/path/to/hass-cli-auth-authentik"
+      # optionally, if it's not in the same directory as the executable:
+      #args: ["--config", "/path/to/config.toml"]
       meta: true
 ``` 
 
@@ -108,12 +152,14 @@ homeassistant:
 
 - If the authenticated user is in the configured `admin_group_name`, they are mapped to the Home Assistant admin group (`system-admin`).
 - If the authenticated user is in the `user_group_name`, they are mapped to the Home Assistant users group (`system-users`).
-- If neither group is configured, or the user is not a member, authentication is denied.
+- If no groups are configured, and the user is authenticated, they're allowed to log in, but no groups assigned.
+- If any groups are configured, and the user is authenticated, but not in any of those groups, they are not allowed to log in.
 
 ---
 
 ## Troubleshooting
 
+- Turn up verbosity using `-v` or `-vvv`: Note `TRACE` Level will output passwords onto the console, because they're in the environment.
 - **User not found or not in required group:** Make sure the Authentik flow is correct and the user is a member of the correct group(s).
 - **Timeout errors:** Increase the `timeout` parameter in `config.toml` if needed.
 - **Flow errors:** Double-check your Authentik flow setup.
@@ -127,19 +173,5 @@ homeassistant:
 ---
 
 ### Notes
-
-- Please refer to the Authentik documentation for flow setup and group management.
-- If you encounter issues, enable verbose logging by adding `-v` to the command for more debug information.
-
----
-
-**Fill in the Flow Requirements Below:**
-
-> **Required Authentik Flow Details (to be filled in):**
->
-> - Flow slug:
-> - Required stages:
-> - Required fields:
-> - Special notes:
-```
-
+- Please refer to the [Authentik documentation](https://docs.goauthentik.io/docs/developer-docs/api/flow-executor)
+  for flow setup and group management.
