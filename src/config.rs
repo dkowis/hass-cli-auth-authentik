@@ -1,36 +1,16 @@
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::{env, fs};
-use std::path::PathBuf;
 use crate::prelude::*;
+use serde::Deserialize;
+use std::path::PathBuf;
+use std::{env, fs};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
-    pub ldap_url: String,
-    pub bind_dn: String,
-    pub bind_pw: String,
-    pub user_base_dn: String,
-    pub groups: Vec<String>,
-    #[serde(default = "default_mappings")]
-    pub mappings: HashMap<String, Vec<String>>,
-    #[serde(default = "default_username_attribute")]
-    pub username_attribute: String,
-    #[serde(default = "default_attributes")]
-    pub attributes: Vec<String>,
+    pub authentik_base_url: String,
+    pub flow_slug: String,
     #[serde(default = "default_timeout")]
     pub timeout: usize,
-}
-
-fn default_mappings() -> HashMap<String, Vec<String>> {
-    HashMap::new()
-}
-
-fn default_username_attribute() -> String {
-    "cn".to_string()
-}
-
-fn default_attributes() -> Vec<String> {
-    vec![]
+    pub admin_group_name: Option<String>,
+    pub user_group_name: Option<String>,
 }
 
 fn default_timeout() -> usize {
@@ -49,7 +29,7 @@ impl Config {
     pub fn load(path: &str) -> Result<Self> {
         let expanded_path = expand_tilde(path)?;
         let path = PathBuf::from(expanded_path);
-        let abs_path  = if path.is_absolute() {
+        let abs_path = if path.is_absolute() {
             path
         } else {
             env::current_dir()
@@ -59,7 +39,7 @@ impl Config {
 
         //load in the config file!
         let data = fs::read_to_string(&abs_path)
-            .with_context(|| format!("Unable to read config file at {:?}", abs_path))?;
+            .with_context(|| format!("Unable to read config file at {abs_path:?}"))?;
 
         let config = toml::from_str(&data).context("Failed to parse TOML config")?;
         Ok(config)

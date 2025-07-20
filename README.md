@@ -1,81 +1,145 @@
-# THE PLAN
+# Command-Line Authentik Authentication Provider
 
-Brought to you by an AI analyizing [this lovely project](https://github.com/IsaaacQINH/haos-ldap-auth). I love it, 
-I just am allergic to go, and so I'ma do it in Rust.
-Also that one had errors connecting to LDAP, and I'd rather fix it in Rust than suffer through Go
+This project is a **command line authentication provider** designed to authenticate users against
+an [Authentik](https://goauthentik.io/) identity provider. It's suitable for use with systems that require command-line
+authentication, such as [Home Assistant](https://www.home-assistant.io/). It is specifically targeted towards Home
+Assistant, but may also work with other command line auth systems.
 
-LDAP doesn't seem to work, because it wants some kind of user credential I think.
-https://github.com/goauthentik/authentik/issues/3510#issuecomment-1233345028
-LDAP did work, but my MFA on my user broke things. I need to figure that out.
+---
 
-## 1. Project Setup
-- Initialize a new Rust project with `cargo init`.
-- Establish a clear crate structure:
-  - Use `src/main.rs` for the executable entry point.
-  - Create modules like `config`, `ldap`, `auth`, and `logger` under `src/`.
-- Manage dependencies via `Cargo.toml`:
-  - Use crates such as `ldap3` for LDAP operations.
-  - Use `serde` + `serde_yaml` for YAML configuration parsing.
-  - use tracing and tracing_subscriber with environment
+## Features
 
-## 2. Configuration Management
-- Define a configuration struct reflecting the YAML config using `serde` with `derive` macros.
-- Implement a function to:
-  - Read the config file path from CLI args (use `std::env::args` or `clap` crate).
-  - Deserialize the YAML config using `serde_yaml`.
-  - Provide defaults for missing fields if necessary.
-- Consider making config immutable and thread-safe (`Arc<Config>`) if needed later.
+- Authenticate users via Authentik using a custom flow.
+- Map users to Home Assistant groups based on Authentik group membership.
+_- Configurable via a simple `config.toml` file.
+- Designed for use as a Home_
+  Assistant [command line authentication provider](https://www.home-assistant.io/docs/authentication/providers/#command-line).
 
-## 3. Logging
-- Use the `log` crate with a logger implementation (`env_logger` or `simplelog`).
-- Initialize logging early in `main`.
-- Write logs to a file as well as optionally stderr/stdout.
-- Replicate log messages and levels suitably.
+---
 
-## 4. LDAP Connection and Operations
-- Use the `ldap3` crate for LDAP operations:
-  - Establish connection and binding with LDAP server.
-  - Perform user search queries.
-  - Attempt user bind for authentication verification.
-- Model LDAP results into Rust structs.
-- Properly handle and propagate errors using Rust `Result` and custom error types.
+## Table of Contents
 
-## 5. Authentication Workflow
-- Implement the main authentication flow resembling `cmd.Auth()` in Go:
-  - Load config.
-  - Get user credentials from environment variables.
-  - Connect and bind to LDAP server.
-  - Search user details using search base and filters.
-  - Attempt bind with user credentials.
-  - Log success or failures accordingly.
-  - Output user info to stdout on success.
-  - Exit with status codes.
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Setting up Authentik Flow](#setting-up-authentik-flow)
+- [Usage](#usage)
+- [Integration with Home Assistant](#integration-with-home-assistant)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
-## 6. CLI Interface
-- Implement CLI argument parsing with `clap` or `structopt`.
-- Allow config path override via CLI.
-- Provide helpful error messages to users.
-- Ensure proper exit codes on error or success.
+---
 
-## 7. Error Handling
-- Define a custom error enum encompassing config errors, LDAP errors, and IO errors.
-- Use `thiserror` crate for ergonomics.
-- Use `anyhow` or similar if you prefer general error handling.
-- Avoid panics; rather, return errors and handle gracefully in `main`.
+## Installation
 
-## 8. Testing
-- Write unit tests for:
-  - Config parsing.
-  - Error handling.
-  - Parsing environment variables for credentials.
-- Consider integration tests using a local or test LDAP server.
+1. **Build the project:**
 
-## 9. Documentation and Examples
-- Write Rustdoc comments for public functions and types.
-- Update README with instructions for building and running the Rust version.
-- Provide example `config.yml` and usage notes.
+   ```bash
+   cargo build --release
+   ```
 
-## 10. Packaging and Deployment
-- Use `cargo build --release` to create optimized builds.
-- Optionally create Dockerfile or distribution binaries.
-- Ensure the CLI behaves like the original Go binary for smooth substitution.
+2. **Copy the executable** (from `target/release/`) to your desired location.
+
+---
+
+## Configuration
+
+Create a `config.toml` file in the application directory, based on the following example:
+```toml
+authentik_base_url = "https://auth.example.com" 
+flow_slug = "simple-password" 
+admin_group_name = "Home Assistant Admins" 
+user_group_name = "Home Assistant Users" 
+timeout = 10
+``` 
+
+### Configuration Fields
+
+- **authentik_base_url**: The base URL for your Authentik instance.
+- **flow_slug**: The slug of the flow used for authentication.
+- **admin_group_name** (optional): The Authentik group that corresponds to Home Assistant admins.
+- **user_group_name** (optional): The Authentik group that corresponds to regular Home Assistant users.
+- **timeout**: Request timeout in seconds.
+
+---
+
+## Setting up Authentik Flow
+
+> ⚠️ Before using this application, you must create a suitable **authentication flow** in Authentik.  
+> The flow must accept the user's `username` and `password`, and provide the necessary user information when authentication succeeds.
+
+### Required Fields/Stages for the Flow
+
+**[Please fill in this section with the specific Authentik flow requirements for your deployment, such as required stage types and field names.]**
+
+---
+
+## Usage
+
+You can use the authentication provider directly via the command line:
+```
+bash ./command-line-auth-provider --username  --password  --config_path config. toml
+``` 
+
+- Returns exit code `0` if authentication succeeds, and prints fields required by Home Assistant.
+- Returns a non-zero exit code if authentication fails.
+
+Environment variables `username` and `password` can also be used to supply credentials.
+
+---
+
+## Integration with Home Assistant
+
+This project is designed for use with [Home Assistant's command line authentication provider](https://www.home-assistant.io/docs/authentication/providers/#command-line).
+
+### Example Home Assistant Configuration
+
+In your Home Assistant `configuration.yaml`:
+```yaml 
+homeassistant: 
+  auth_providers: 
+    - type: command_line
+      command: "/your/path/to/command-line-auth-provider --config_path /your/path/to/config.toml" 
+      meta: true
+``` 
+
+- Home Assistant supplies `username` and `password` as environment variables to the command.
+
+### How the Integration Works
+
+- If the authenticated user is in the configured `admin_group_name`, they are mapped to the Home Assistant admin group (`system-admin`).
+- If the authenticated user is in the `user_group_name`, they are mapped to the Home Assistant users group (`system-users`).
+- If neither group is configured, or the user is not a member, authentication is denied.
+
+---
+
+## Troubleshooting
+
+- **User not found or not in required group:** Make sure the Authentik flow is correct and the user is a member of the correct group(s).
+- **Timeout errors:** Increase the `timeout` parameter in `config.toml` if needed.
+- **Flow errors:** Double-check your Authentik flow setup.
+
+---
+
+## License
+
+[MIT License](./LICENSE)
+
+---
+
+### Notes
+
+- Please refer to the Authentik documentation for flow setup and group management.
+- If you encounter issues, enable verbose logging by adding `-v` to the command for more debug information.
+
+---
+
+**Fill in the Flow Requirements Below:**
+
+> **Required Authentik Flow Details (to be filled in):**
+>
+> - Flow slug:
+> - Required stages:
+> - Required fields:
+> - Special notes:
+```
+
