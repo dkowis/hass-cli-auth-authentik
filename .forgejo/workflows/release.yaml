@@ -68,9 +68,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+          components: rust-src
 
-      - name: Install cross
-        run: cargo install cross
+#      - name: Install cross
+#        run: cargo install cross
+      - name: Install cross-rs
+        uses: cross-rs/cross-rs@v0.2.1
 
 #      - name: Install aarch64 GNU cross-compilation dependencies
 #        if: matrix.target == 'aarch64-unknown-linux-gnu'
