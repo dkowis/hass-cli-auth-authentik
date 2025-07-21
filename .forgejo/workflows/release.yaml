@@ -74,6 +74,7 @@ jobs:
         run: |
           cargo install --force cross
           cross --version
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
 #      - name: Install aarch64 GNU cross-compilation dependencies
 #        if: matrix.target == 'aarch64-unknown-linux-gnu'
@@ -100,6 +101,8 @@ jobs:
           sudo apt-get install -y upx
 
       - name: Build binary
+        env:
+          CROSS_CONTAINER_OPTS: "-v $HOME/.cargo/bin:/usr/local/cargo/bin:z"
         run: |
           cross build --release --target ${{ matrix.target }} -vv
           upx --best --lzma target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
