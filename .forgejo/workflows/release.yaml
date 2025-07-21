@@ -70,10 +70,10 @@ jobs:
           targets: ${{ matrix.target }}
           components: rust-src
 
-#      - name: Install cross
-#        run: cargo install cross
-      - name: Install cross-rs
-        uses: cross-rs/cross-rs@v0.2.1
+      - name: Install cross
+        run: |
+          cargo install --force cross
+          cross --version
 
 #      - name: Install aarch64 GNU cross-compilation dependencies
 #        if: matrix.target == 'aarch64-unknown-linux-gnu'
@@ -101,7 +101,7 @@ jobs:
 
       - name: Build binary
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cross build --release --target ${{ matrix.target }} -vv
           upx --best --lzma target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
           cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }} ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }}
           sha256sum ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }} > ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }}.sha256
