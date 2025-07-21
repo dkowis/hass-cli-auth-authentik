@@ -1,16 +1,7 @@
 on:
   push:
-    branches: [ "main" ]
     tags:
       - 'v*'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-  pull_request:
-    branches: [ "main" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
 
 env:
   CARGO_TERM_COLOR: always
