@@ -39,95 +39,78 @@ jobs:
       - name: Run tests
         run: cargo test --all-features
 
-  release-build:
-    name: Build Release
+  build-glibc:
+    name: Build Release (glibc)
     needs: check
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    services:
-      dind:
-        image: docker:dind
-        privileged: true
-        env:
-          DOCKER_TLS_CERTDIR: ""
-        ports:
-          - 2375:2375
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            platform: linux-gnu
-            arch: x86_64
-          - target: x86_64-unknown-linux-musl
-            platform: linux-musl
-            arch: x86_64
-          - target: aarch64-unknown-linux-gnu
-            platform: linux-gnu
-            arch: arm64
-          - target: aarch64-unknown-linux-musl
-            platform: linux-musl
-            arch: arm64
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-          components: rust-src
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Install cross
-        run: |
-          cargo install --force cross
-          cross --version
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-#      - name: Install aarch64 GNU cross-compilation dependencies
-#        if: matrix.target == 'aarch64-unknown-linux-gnu'
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install -y gcc-aarch64-linux-gnu
-#
-#      - name: Install aarch64 MUSL cross-compilation dependencies
-#        if: matrix.target == 'aarch64-unknown-linux-musl'
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install -y gcc-aarch64-linux-gnu musl-tools
-#          sudo ln -s /usr/bin/aarch64-linux-gnu-gcc /usr/bin/aarch64-linux-musl-gcc
-#
-#      - name: Install x86_64 MUSL tools
-#        if: matrix.target == 'x86_64-unknown-linux-musl'
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install -y musl-tools
+      - name: Build binary for glibc
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Install UPX
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y upx
+        run: sudo apt-get update && sudo apt-get install -y upx
 
-      - name: Build binary
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-          HOSTNAME: "github-runner"
-          DOCKER_BUILDKIT: "1"
+      - name: Compress binary
         run: |
-          cross build --release --target ${{ matrix.target }} -vv
-          upx --best --lzma target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-          cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }} ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }}
-          sha256sum ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }} > ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }}.sha256
+          upx --best --lzma target/x86_64-unknown-linux-gnu/release/${{ env.BINARY_NAME }}
+          cp target/x86_64-unknown-linux-gnu/release/${{ env.BINARY_NAME }} ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-gnu
+          sha256sum ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-gnu > ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-gnu.sha256
 
-      - name: Upload Release
+      - name: Upload Release (glibc)
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: |
-            ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.platform }}*
-          name: Release ${{ github.ref_name }}
+          files: ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-gnu*
+          name: Release ${{ github.ref_name }} (glibc)
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  build-musl:
+    name: Build Release (musl)
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:latest
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies in Alpine
+        run: |
+          apk update
+          apk add --no-cache musl musl-dev musl-utils rust cargo upx bash
+
+      - name: Setup Rust target for musl
+        run: rustup target add x86_64-unknown-linux-musl
+
+      - name: Build binary for musl
+        run: cargo build --release --target x86_64-unknown-linux-musl
+
+      - name: Compress binary
+        run: |
+          upx --best --lzma target/x86_64-unknown-linux-musl/release/${{ env.BINARY_NAME }}
+          cp target/x86_64-unknown-linux-musl/release/${{ env.BINARY_NAME }} ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-musl
+          sha256sum ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-musl > ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-musl.sha256
+
+      - name: Upload Release (musl)
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: ${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64-linux-musl*
+          name: Release ${{ github.ref_name }} (musl)
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
